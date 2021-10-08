@@ -192,16 +192,60 @@ router.post('/productCart', isAuthenticate, async (req, res) => {
         // match product in cart
 
 
-
         let messageGet = await alreadyUser.setProduct(name, price, color, image, size, starting_price);
-
-        console.log(messageGet)
-
         res.status(200).json({ msg: "product add to cart successfully" })
 
 
     } catch (error) {
         res.status(404).json({ msg: "product not add to  successfully" })
+
+    }
+})
+
+
+// send user information
+router.post("/userInfo", isAuthenticate, async (req, res) => {
+    try {
+
+        let id = await req.userId;
+        const { firstName, lastName, email, phone, country, postalCode, city, state, address } = (req.body)
+
+        let alreadyUser = await userModel.findOne({ _id: id })
+
+        // match product in cart
+
+
+        let userInfo = await alreadyUser.setUserInfo(
+
+            firstName, lastName, email, phone, country, postalCode, city, state, address
+        );
+
+
+        res.status(200).json({ msg: "user info add successfully" })
+
+    } catch (error) {
+        res.status(404).json({ msg: "error user info not send" })
+    }
+})
+
+// deleted item from carts
+router.post("/removItem", isAuthenticate, async (req, res) => {
+
+    try {
+        const id = req.body.id
+        const reqId = req.userId
+        // console.log(id)
+        const findCartData = await userModel.findOne({ _id: reqId })
+        // const rem = (findCartData.carts).filter((elem) => {
+        //     return elem.id === id
+        // })
+        const rem = await findCartData.sendIdToRemovItem(id)
+        // console.log(rem)
+        await userModel.save()
+        res.status(200).json({ msg: "item deleted successfully" })
+
+    } catch (error) {
+        res.status(404).json({ msg: "error item not deleted" })
 
     }
 })
@@ -218,6 +262,27 @@ router.get("/logo", async (req, res) => {
     }
 })
 
+router.post("/cartsFinallyOrders", async (req, res) => {
+    try {
+        const data = req.body;
+        const id = req.body.id;
+        // console.log(data)
+
+
+        let alreadyUser = await userModel.findOne({ _id: id });
+
+        const userOrders = await alreadyUser.setFinallyOrders(
+
+            { ...data }
+        )
+        // console.log(userOrders)
+
+        res.send("yes get it")
+    } catch (error) {
+        res.status(404).json({ msg: "logo not send" })
+    }
+})
+
 
 const secretKey = "2e0TiXHTcHs252qDrcXUHOaQ"
 const keyId = "rzp_test_MgNn5wEsqPADa4"
@@ -228,14 +293,28 @@ var razorpay = new Razorpay({
 });
 
 
-router.get("/razorpayMoney", (req, res) => {
-    res.send("error")
-})
-
 router.post("/razorpayMoney", async (req, res) => {
+    const userDetail = req.body;
+    // console.log(userDetail)
+    const { firstName, id, lastName, phone, country, postalCode, city, state, address, price, email
+    } = (req.body)
+
+    userModel.findOne({ _id: id }).then((alreadyUser) => {
+
+        alreadyUser.setOrders(
+            firstName, lastName, phone, country, postalCode, city, state, address, price, email
+        );
+
+
+        // alreadyUser.carts[""];
+        // alreadyUser.carts = [];
+
+    }).catch((err) => {
+        console.log('Error coming to set the orders details' + err)
+    })
 
     const payment_capture = 1
-    const amount = 500
+    const amount = userDetail.price
     const currency = "INR"
 
     const options = {
@@ -246,11 +325,13 @@ router.post("/razorpayMoney", async (req, res) => {
     };
 
     const response = await razorpay.orders.create(options);
+    // console.log(response)
 
     res.status(200).json({
         id: response.id,
         amount: response.amount,
         currency: response.currency,
+        receipt: response.receipt,
 
     })
 
